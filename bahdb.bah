@@ -1,0 +1,526 @@
+#include "iostream.bah"
+#include "thread.bah"
+#include "rand.bah"
+#include "json.bah"
+
+#define! usleep(i int)
+#define! atexit(p ptr) int
+
+const DEFAULT_HEADER_SIZE = 32768
+
+struct bahDB_ref {
+    field: cpstring
+    value: cpstring
+    ref: int
+    pos: int
+    next: int = -1
+}
+
+struct bahDB_entry {
+    data: cpstring
+    avail: int
+    pos: int
+}
+
+struct bahDB_vacant {
+    pos: int
+    size: int
+}
+
+struct bahDB__header {
+    indexes: []bahDB_ref*
+    freePos: []bahDB_vacant*
+    lastPos: int = 0
+    dataPos: int = DEFAULT_HEADER_SIZE
+}
+
+
+__bahDB_mutex = []cpstring
+
+__bahDB_deleteMutexes() {
+    i=0; for i < len(__bahDB_mutex), i++ {
+        removeFile(__bahDB_mutex[i])
+    }
+}
+
+__bahDB_ok_exit = atexit(__bahDB_deleteMutexes)
+
+struct bahDB {
+    fm: fileMap
+    name: cpstring
+    m: cpstring
+    lock() {
+        for mkdir(this.m, 600) == -1 {
+            usleep(300)
+        }
+    }
+    unlock() {
+        removeFile(this.m)
+    }
+
+    grow(nb int) {
+        this.fm.close()
+        fs = fileStream{}
+        fs.open(this.name, "a")
+        i=0; for i < nb + 10, i++ {
+            fs.writeFile(" ")
+        }
+        fs.close()
+        this.fm.open(this.name)
+    }
+
+    getAtOffset(i int) cpstring {
+        p cpstring = this.fm.p
+        return noCheck(p + i)
+    }
+
+    // growIndex(h bahDB__header*, i int) {
+        
+    //     this.grow(i)
+    // }
+
+    getChar(i int) char {
+        p cpstring = this.fm.p
+        return noCheck(p[i])
+    }
+
+    write(s cpstring, pos int) {
+        memcpy(this.getAtOffset(pos), s, strlen(s))
+    }
+
+    serialHeader(h bahDB__header*) {
+        j = toJson(h)
+        this.write(intToStr(strlen(j))+"\n"+j, 0)
+    }
+
+    loadHeader() bahDB__header* {
+        h = new bahDB__header
+        nbs = []char
+        c = '0'
+        i=0; for isNumber(c), i++ {
+            nbs[i] = c
+            c = this.getChar(i)
+        }
+        nbs[i] = <char>0
+        size = strToInt(arrAsStr(nbs))
+        s = memoryAlloc(size + 1)
+        memcpy(s, this.getAtOffset(i), size)
+        j = parseJson(s)
+        j.scan(h)
+        return h
+    }
+
+    readAtPos(i int, e reflectElement) {
+
+        c = this.getChar(i)
+
+        for isNumber(c) == 0, i++ {
+            c = this.getChar(i)
+        }
+        i--
+
+        nbs = []char
+        c = '0'
+        for isNumber(c), i++ {
+            nbs[len(nbs)] = c
+            c = this.getChar(i)
+        }
+        nbs[len(nbs)] = <char>0
+        size = strToInt(arrAsStr(nbs))
+        s = memoryAlloc(size + 1)
+        memcpy(s, this.getAtOffset(i), size)
+
+        j = parseJson(s)
+        j.scan(e)
+    }
+
+    readJsonAtPos(i int) cpstring {
+        c = this.getChar(i)
+        for isSpace(c), i++ {
+            c = this.getChar(i)
+        }
+        i--
+        nbs = []char
+        c = '0'
+        for isNumber(c), i++ {
+            nbs[len(nbs)] = c
+            c = this.getChar(i)
+        }
+        nbs[len(nbs)] = <char>0
+        size = strToInt(arrAsStr(nbs))
+        s = memoryAlloc(size + 1)
+        memcpy(s, this.getAtOffset(i), size)
+        return s
+    }
+
+    getFreePos(s int, h bahDB__header*) int {
+        i=0; for i < len(h.freePos), i++ {
+            v = h.freePos[i]
+            if v.size >= s {
+                return v.pos
+            }
+        }
+        return -1
+    }
+
+    getSize(e reflectElement) int {
+        j = toJson(e)
+        size = strlen(j)
+        serS = intToStr(size)
+        size = size + strlen(serS) + 2
+        return size
+    }
+
+    append(e reflectElement, h bahDB__header*) {
+        j = toJson(e)
+        size = strlen(j)
+        serS = intToStr(size)
+        j = "\n"+serS+"\n"+j
+        size = size + strlen(serS) + 2
+        
+        found = false
+        i=0; for i < len(h.freePos), i++ {
+            v = h.freePos[i]
+            if v.size >= size {
+                found = true
+                this.write(j, v.pos + h.dataPos)
+                k=i+1; for k < len(h.freePos), k++ {
+                    h.freePos[k-1] = h.freePos[k]
+                }
+                l = len(h.freePos)
+                noCheck(h.freePos->length = l-1)
+                break
+            }
+        }
+        
+        if found == false {
+            avail = this.fm.size - h.lastPos - h.dataPos
+            if avail < size {
+                this.grow(size - avail)
+            }
+            this.write(j, h.lastPos + h.dataPos)
+            h.lastPos = h.lastPos + size
+        }
+    }
+
+    appendEntry(e bahDB_entry*, h bahDB__header*) {
+        e.pos = h.lastPos
+        j = toJson(e)
+        size = strlen(j)
+        serS = intToStr(size)
+        j = "\n"+serS+"\n"+j
+        size = size + strlen(serS) + 2
+        
+        found = false
+        i=0; for i < len(h.freePos), i++ {
+            v = h.freePos[i]
+            if v.size >= size {
+                e.pos = v.pos
+                found = true
+                this.write(j, v.pos + h.dataPos)
+                k=i+1; for k < len(h.freePos), k++ {
+                    h.freePos[k-1] = h.freePos[k]
+                }
+                l = len(h.freePos)
+                noCheck(h.freePos->length = l-1)
+                break
+            }
+        }
+
+        if found == false {        
+            avail = this.fm.size - h.lastPos - h.dataPos
+            if avail < size {
+                this.grow(size - avail)
+            }
+            this.write(j, h.lastPos + h.dataPos)
+            h.lastPos = h.lastPos + size
+        }
+    }
+
+    insertReference(r bahDB_ref*, h bahDB__header*) {
+        i=0; for i < len(h.indexes), i++ {
+            ind = h.indexes[i]
+            if ind.field == r.field {
+                r.pos = 0
+                ind.pos = this.getFreePos(this.getSize(ind), h)
+                if ind.pos == -1 {
+                    ind.pos = h.lastPos
+                }
+                r.next = ind.pos
+                this.append(ind, h)
+                h.indexes[i] = r
+                return
+            }
+        }
+        h.indexes[len(h.indexes)] = r
+    }
+
+    insertReferences(e bahDB_entry*, el reflectElement, h bahDB__header*) []bahDB_ref* {
+        ret = []bahDB_ref*
+        i=0; for i < len(el.structLayout), i++ {
+            f = el.structLayout[i]
+            f.value = f.calculateOffset(el.value)
+            ref = new bahDB_ref
+            ref.ref = e.pos
+            ref.field = f.name
+            ref.value = toJson__inner(f, true, 0)
+            this.insertReference(ref, h)
+        }
+
+        return ret
+    }
+    
+
+    getPos(f cpstring, v cpstring) []int {
+
+        h = this.loadHeader()
+        ret = []int
+        i=0; for i < len(h.indexes), i++ {
+            r = h.indexes[i]
+            if r.field == f {
+                if r.value == v {
+                    ret[len(ret)] = r.ref
+                }
+                n = r
+                for n.next != -1 {
+                    next = n.next
+                    n = new bahDB_ref
+
+                    this.readAtPos(next + h.dataPos, n)
+                    if n.value == v {
+                        ret[len(ret)] = n.ref
+                    } 
+                }
+                break
+            }
+        }
+
+        return ret
+    }
+
+    deleteByPos(i int, h bahDB__header*) {
+        c = this.getChar(i)
+        for isSpace(c), i++ {
+            c = this.getChar(i)
+        }
+        i--
+        start = i
+        nbs = []char
+        c = '0'
+        for isNumber(c), i++ {
+            nbs[len(nbs)] = c
+            c = this.getChar(i)
+        }
+        nbs[len(nbs)] = <char>0
+        size = strToInt(arrAsStr(nbs))
+        blockSize = size + len(nbs) - 1
+        v = new bahDB_vacant
+        v.pos = start - h.dataPos
+        v.size = blockSize
+        h.freePos[len(h.freePos)] = v
+        memset(this.getAtOffset(start), <int>' ', blockSize)
+    }
+
+
+    deleteRefs(e jsonElement*, pos int, h bahDB__header*) {
+        i=0; for i < len(h.indexes), i++ {
+            ind = h.indexes[i]
+            m = e.map(ind.field)
+            if m == null {
+                continue
+            }
+            if ind.ref == pos {
+                if ind.next != -1 {
+                    n = new bahDB_ref
+                    this.readAtPos(ind.next + h.dataPos, n)
+                    h.indexes[i] = n
+                    this.deleteByPos(n.pos + h.dataPos, h)
+                } else {
+                    k=i+1; for k < len(h.indexes), k++ {
+                        h.indexes[k-1] = h.indexes[k]
+                    }
+                    l = len(h.indexes)
+                    noCheck(h.indexes->length = l-1)
+                }
+                continue
+            } else {
+
+            }
+            n = ind
+            p bahDB_ref*
+            for n.next != -1 {
+                next = n.next
+                p = n
+                n = new bahDB_ref
+                this.readAtPos(next + h.dataPos, n)
+                if n.ref == pos {
+
+                    p.next = n.next
+                    
+                    isFirst = false
+                    k=0; for k < len(h.indexes), k++ {
+                        if h.indexes[k] == p {
+                            isFirst = true
+                        }
+                    }
+
+                    if isFirst == false {
+                        j = toJson(p)
+                        size = strlen(j)
+                        serS = intToStr(size)
+                        j = "\n"+serS+"\n"+j
+                        size = size + strlen(serS) + 2
+                        this.write(j, p.pos + h.dataPos)
+                    } else {
+
+                    }
+
+                    this.deleteByPos(n.pos + h.dataPos, h)
+                    break
+                } else {
+
+                }
+            }
+        }
+    }
+
+    //
+    open(name cpstring) {
+        fs = fileStream{}
+        this.fm = fileMap{}
+        this.name = name
+        //creating mutex
+        parts = splitString(string(name), "/")
+        l = parts[len(parts)-1]
+        l.prepend(".")
+        l.append("_tmp")
+        parts[len(parts)-1] = l
+        m = joinString(parts, "/")
+        this.m = m.str()
+        __bahDB_mutex[len(__bahDB_mutex)] = this.m
+        //making initial file
+        fs.open(name, "r")
+        if fs.isValid() == 0 || fs.getSize() == 0 {
+            fs.createFile(name)
+            this.grow(DEFAULT_HEADER_SIZE)
+            h = new bahDB__header
+            h.dataPos = DEFAULT_HEADER_SIZE
+            h.lastPos = 0
+            this.serialHeader(h)
+        } else {
+            fs.close()
+            this.fm.open(name)
+        }
+    }
+    
+
+    close() {
+        this.fm.close()
+    }
+
+
+    insert(e reflectElement) {
+        this.lock()
+        
+        h = this.loadHeader()
+        
+        entry = new bahDB_entry
+        entry.data = toJson(e)
+        this.appendEntry(entry, h)
+
+        this.insertReferences(entry, e, h)
+        
+        this.serialHeader(h)
+
+        this.unlock()
+    }
+
+    select(f cpstring, v reflectElement, e reflectElement) {
+        this.lock()
+        h = this.loadHeader()
+        pos = this.getPos(f, toJson(v))
+
+        if e.isArray == false && len(pos) > 0 {
+            entry = new bahDB_entry
+            this.readAtPos(pos[0] + h.dataPos, entry)
+            j = parseJson(entry.data)
+            j.scan(e)
+        } else {
+            entry = new bahDB_entry
+            s = "["
+            i=0; for i < len(pos), i++ {
+                if i != 0 {
+                    s = s + ","
+                }
+
+                this.readAtPos(pos[i] + h.dataPos, entry)
+                s = s + entry.data
+            }
+            s = s + "]"
+            j = parseJson(s)
+            j.scan(e)
+        }
+
+        this.unlock()
+    }
+
+    delete(f cpstring, v reflectElement) {
+        this.lock()
+        h = this.loadHeader()
+        pos = this.getPos(f, toJson(v))
+
+        entry = new bahDB_entry
+        i=0; for i < len(pos), i++ {
+
+            this.readAtPos(pos[i] + h.dataPos, entry)
+            j = parseJson(entry.data)
+            this.deleteRefs(j, pos[i], h)
+
+            this.deleteByPos(pos[i] + h.dataPos, h)
+            this.serialHeader(h)
+        }
+
+
+        this.unlock()
+    }
+
+    update(f cpstring, v reflectElement, e reflectElement, rf cpstring, rv reflectElement) {
+        this.lock()
+        h = this.loadHeader()
+        pos = this.getPos(f, toJson(v))
+
+        entry = new bahDB_entry
+        i=0; for i < len(pos), i++ {
+            //fetch old data
+            this.readAtPos(pos[i] + h.dataPos, entry)
+            j = parseJson(entry.data)
+            j.scan(e)
+            k=0; for k < len(e.structLayout), k++ {
+                m = e.structLayout[k]
+                if m.name == rf {
+                    m.value = rv.value
+                    e.structLayout[k] = m
+                    
+                }
+            }
+
+            //remove old data
+            this.readAtPos(pos[i] + h.dataPos, entry)
+            j = parseJson(entry.data)
+            this.deleteRefs(j, pos[i], h)
+            this.deleteByPos(pos[i] + h.dataPos, h)
+            this.serialHeader(h)
+
+            //place new data
+            entry = new bahDB_entry
+            entry.data = toJson(e)
+            this.appendEntry(entry, h)
+            this.insertReferences(entry, e, h)
+            this.serialHeader(h)
+
+        }
+
+        this.unlock()
+    }
+
+}

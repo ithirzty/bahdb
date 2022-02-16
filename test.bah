@@ -1,0 +1,21 @@
+#include "iostream.bah"
+
+#include "bahdb.bah"
+
+
+struct test {
+    a: int
+    b: cpstring
+}
+
+// #cLib "g"
+
+main(args []cpstring) int {
+    db = bahDB{}
+    db.open("test.dat")
+
+    
+
+    db.close()
+    return 0
+}
