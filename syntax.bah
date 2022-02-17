@@ -142,6 +142,10 @@ struct bahDB_synax_setter {
 
 }
 
+//Creates a database setter.
+//Adding multiple setters:
+//    dbSet() + dbSet() 
+//results in both fields being changed.
 dbSet(field cpstring, val reflectElement) bahDB_synax_setter* {
     s = new bahDB_synax_setter
     s.field = field
