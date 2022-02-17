@@ -545,7 +545,7 @@ struct bahDB {
     //  template: a structure used as a template (containing the fields of the element, must be empty)
     //  setField: the field that needs to be updated
     //  setValue: the new value for that field
-    update(cond bahDB_synax_operator*, e reflectElement, rf cpstring, rv reflectElement) {
+    update(cond bahDB_synax_operator*, e reflectElement, vals bahDB_synax_setter*) {
         this.lock()
         h = this.loadHeader()
         pos = this.getPos(cond)
@@ -558,9 +558,10 @@ struct bahDB {
             j.scan(e)
             k=0; for k < len(e.structLayout), k++ {
                 m = e.structLayout[k]
-                if m.name == rf {
+                val = vals.getField(m.name)
+                if val != null {
                     mv ptr* = m.value
-                    *mv = rv.value
+                    *mv = val.val.value
                     e.structLayout[k] = m
                 }
             }

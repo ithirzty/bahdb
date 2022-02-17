@@ -54,6 +54,17 @@ condition = dbWhere("field", DB_EQUALS, value) + dbWhere("field2", DB_LIKE, "%te
 //and element.field2 contains "test"
 ```
 
+### Setters
+Used for updating a specified field of an object.
+
+```bah
+setter = dbSet("field", value)
+//means any element where element.field = value
+```
+
+#### Chaning setters
+As operations, setters can be chained using the `+` operator.
+
 ### Inserting
 Used for inserting an element in the database.
 ```bah
@@ -66,8 +77,9 @@ Used for updating the content of an element inside the database.
 ```bah
 template = new myStruct
 
-db.update(condition, template, "fielToSet", valueToSet)
+db.update(condition, template, setter)
 ```
+The template is used as a skeletton, only the fields presents in the template will be kepped.
 
 ### Selecting
 Used for fetching the requested elements from the databse.

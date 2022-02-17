@@ -45,7 +45,8 @@ demoUpdate() {
     print("> ")
     content = stdinput()
     
-    db.update(dbWhere("author", DB_EQUALS, author), m, "content", content)
+    db.update(dbWhere("author", DB_EQUALS, author), m,
+     dbSet("content", content) + dbSet("date", getTimeUnix()))
     
     db.close()
 }

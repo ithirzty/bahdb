@@ -115,3 +115,36 @@ dbWhere(l cpstring, op int, r reflectElement) bahDB_synax_operator* {
     o.right = toJson(r)
     return o
 }
+
+struct bahDB_synax_setter {
+    field: cpstring
+    val: reflectElement
+
+    children: []bahDB_synax_setter*
+
+    add(s bahDB_synax_setter*) bahDB_synax_setter* {
+        this.children[len(this.children)] = s
+        return this
+    }
+
+    getField(f cpstring) bahDB_synax_setter* {
+        if this.field == f {
+            return this
+        }
+        i=0; for i < len(this.children), i++ {
+            c = this.children[i]
+            if c.field == f {
+                return c
+            }
+        }
+        return null
+    }
+
+}
+
+dbSet(field cpstring, val reflectElement) bahDB_synax_setter* {
+    s = new bahDB_synax_setter
+    s.field = field
+    s.val = val
+    return s
+}
