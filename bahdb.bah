@@ -209,20 +209,30 @@ struct bahDB {
         j = "\n"+serS+"\n"+j
         size = size + strlen(serS) + 2
         
+        // indfrp = []bahDB_vacant*
+        // i=0; for i < len(h.freePos), i++ {
+        //     indfrp[i] = h.freePos[i]
+        // }
+
         found = false
-        i=0; for i < len(h.freePos), i++ {
-            v = h.freePos[i]
-            if v.size >= size {
-                found = true
-                this.write(j, v.pos + h.dataPos)
-                k=i+1; for k < len(h.freePos), k++ {
-                    h.freePos[k-1] = h.freePos[k]
-                }
-                l = len(h.freePos)
-                noCheck(h.freePos->length = l-1)
-                break
-            }
-        }
+        // i=0; for i < len(indfrp), i++ {
+        //     v = indfrp[i]
+        //     if v.size >= size {
+        //         found = true
+        //         //set vpos
+        //         this.write(j, v.pos + h.dataPos)
+        //         k=i+1; for k < len(h.freePos), k++ {
+        //             h.freePos[k-1] = h.freePos[k]
+        //         }
+        //         l = len(h.freePos)
+        //         if l == 1 {
+        //             h.freePos = []bahDB_vacant*
+        //         } else {
+        //             noCheck(h.freePos->length = l-1)
+        //         }
+        //         break
+        //     }
+        // }
         
         if found == false {
             avail = this.fm.size - h.lastPos - h.dataPos
@@ -243,9 +253,14 @@ struct bahDB {
         j = "\n"+serS+"\n"+j
         size = size + strlen(serS) + 2
         
-        found = false
+        indfrp = []bahDB_vacant*
         i=0; for i < len(h.freePos), i++ {
-            v = h.freePos[i]
+            indfrp[i] = h.freePos[i]
+        }
+
+        found = false
+        i=0; for i < len(indfrp), i++ {
+            v = indfrp[i]
             if v.size >= size {
                 e.pos = v.pos
                 found = true
@@ -254,7 +269,11 @@ struct bahDB {
                     h.freePos[k-1] = h.freePos[k]
                 }
                 l = len(h.freePos)
-                noCheck(h.freePos->length = l-1)
+                if l == 1 {
+                    h.freePos = []bahDB_vacant*
+                } else {
+                    noCheck(h.freePos->length = l-1)
+                }
                 break
             }
         }
@@ -275,10 +294,10 @@ struct bahDB {
             ind = h.indexes[i]
             if ind.field == r.field {
                 r.pos = 0
-                ind.pos = this.getFreePos(this.getSize(ind), h)
-                if ind.pos == -1 {
+                // ind.pos = this.getFreePos(this.getSize(ind), h)
+                // if ind.pos == -1 {
                     ind.pos = h.lastPos
-                }
+                // }
                 r.next = ind.pos
                 this.append(ind, h)
                 h.indexes[i] = r
@@ -369,13 +388,19 @@ struct bahDB {
 
     //INTERNAL FUNCTION
     deleteRefs(e jsonElement*, pos int, h bahDB__header*) {
+
+
+
+        refInd = []bahDB_ref*
         i=0; for i < len(h.indexes), i++ {
-            ind = h.indexes[i]
-            m = e.map(ind.field)
-            if m == null {
-                continue
-            }
+            refInd[i] = h.indexes[i]
+        }
+
+        i=0; for i < len(refInd), i++ {
+            ind = refInd[i]
+
             if ind.ref == pos {
+
                 if ind.next != -1 {
                     n = new bahDB_ref
                     this.readAtPos(ind.next + h.dataPos, n)
@@ -386,7 +411,11 @@ struct bahDB {
                         h.indexes[k-1] = h.indexes[k]
                     }
                     l = len(h.indexes)
-                    noCheck(h.indexes->length = l-1)
+                    if l == 1 {
+                        h.indexes = []bahDB_ref*
+                    } else {
+                        noCheck(h.indexes->length = l-1)
+                    }
                 }
                 continue
             }
@@ -398,14 +427,16 @@ struct bahDB {
                 n = new bahDB_ref
                 this.readAtPos(next + h.dataPos, n)
                 if n.ref == pos {
+                    
+
 
                     p.next = n.next
                     
-                    isFirst = false
-                    k=0; for k < len(h.indexes), k++ {
-                        if h.indexes[k] == p {
-                            isFirst = true
-                        }
+                    isFirst = p in refInd
+                    isFound = p in h.indexes
+
+                    if isFirst != isFound {
+
                     }
 
                     if isFirst == false {
