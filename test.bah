@@ -45,7 +45,7 @@ demoUpdate() {
     print("> ")
     content = stdinput()
     
-    db.update("author", author, m, "content", content)
+    db.update(dbWhere("author", DB_EQUALS, author), m, "content", content)
     
     db.close()
 }
@@ -60,7 +60,7 @@ demoDelete() {
     print("> ")
     author = stdinput()
 
-    db.delete("author", author)
+    db.delete(dbWhere("author", DB_EQUALS, author))
     
     db.close()
 }
@@ -76,7 +76,7 @@ demoSelect() {
     author = stdinput()
 
     res = []message*    
-    db.select("author", author, res)
+    db.select(dbWhere("author", DB_EQUALS, author), res)
     
     println(toJson(res))
 

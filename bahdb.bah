@@ -34,6 +34,26 @@ struct bahDB__header {
     dataPos: int = DEFAULT_HEADER_SIZE
 }
 
+__db_remove_pos(pos []int, ref int) {
+    isInside = false
+    i=0; for i < len(pos), i++ {
+        if pos[i] == ref {
+            isInside = true
+            break
+        }
+    }
+    if isInside == false {
+        return
+    }
+    i++; for i < len(pos), i++ {
+        pos[i-1] = pos[i]
+    }
+    l = len(pos)
+    noCheck(pos->length = l - 1)
+
+}
+
+#include "syntax.bah"
 
 __bahDB_mutex = []cpstring
 
@@ -286,15 +306,21 @@ struct bahDB {
     
 
     //INTERNAL FUNCTION
-    getPos(f cpstring, v cpstring) []int {
+    getPos(parentCond bahDB_synax_operator*) []int {
 
         h = this.loadHeader()
         ret = []int
+        firstIter = true
         i=0; for i < len(h.indexes), i++ {
             r = h.indexes[i]
-            if r.field == f {
-                if r.value == v {
-                    ret[len(ret)] = r.ref
+            cond = parentCond.getField(r.field)
+            if cond != null {
+                if cond.check(r.value) {
+                    if firstIter == true {
+                        ret[len(ret)] = r.ref
+                    }
+                } else {
+                    __db_remove_pos(ret, r.ref)
                 }
                 n = r
                 for n.next != -1 {
@@ -302,11 +328,15 @@ struct bahDB {
                     n = new bahDB_ref
 
                     this.readAtPos(next + h.dataPos, n)
-                    if n.value == v {
-                        ret[len(ret)] = n.ref
-                    } 
+                    if cond.check(n.value) {
+                        if firstIter == true {
+                            ret[len(ret)] = n.ref
+                        }
+                    } else {
+                        __db_remove_pos(ret, n.ref)
+                    }
                 }
-                break
+                firstIter = false
             }
         }
 
@@ -455,10 +485,10 @@ struct bahDB {
     //  element: a pointer to the structure that needs to be scaned.
     //           This can be either an array of pointer (of the struct's type)
     //           or a single pointer to a structure (that needs to be allocated with new).
-    select(f cpstring, v reflectElement, e reflectElement) {
+    select(cond bahDB_synax_operator*, e reflectElement) {
         this.lock()
         h = this.loadHeader()
-        pos = this.getPos(f, toJson(v))
+        pos = this.getPos(cond)
 
         if e.isArray == false && len(pos) > 0 {
             entry = new bahDB_entry
@@ -488,10 +518,10 @@ struct bahDB {
     //delete(field, value)
     //  field: the field to check
     //  value: the value of the field
-    delete(f cpstring, v reflectElement) {
+    delete(cond bahDB_synax_operator*) {
         this.lock()
         h = this.loadHeader()
-        pos = this.getPos(f, toJson(v))
+        pos = this.getPos(cond)
 
         entry = new bahDB_entry
         i=0; for i < len(pos), i++ {
@@ -515,10 +545,10 @@ struct bahDB {
     //  template: a structure used as a template (containing the fields of the element, must be empty)
     //  setField: the field that needs to be updated
     //  setValue: the new value for that field
-    update(f cpstring, v reflectElement, e reflectElement, rf cpstring, rv reflectElement) {
+    update(cond bahDB_synax_operator*, e reflectElement, rf cpstring, rv reflectElement) {
         this.lock()
         h = this.loadHeader()
-        pos = this.getPos(f, toJson(v))
+        pos = this.getPos(cond)
 
         entry = new bahDB_entry
         i=0; for i < len(pos), i++ {

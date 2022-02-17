@@ -1,0 +1,117 @@
+
+const DB_EQUALS = 0
+const DB_NOT_EQUALS = 1
+const DB_GREATER = 2
+const DB_LESS = 3
+const DB_GREATER_EQUAL = 4
+const DB_LESS_EQUAL = 5
+const DB_LIKE = 6
+
+struct bahDB_synax_operator {
+    left: cpstring
+    op: int
+    right: cpstring
+
+    children: []bahDB_synax_operator*
+
+    add(o bahDB_synax_operator*) bahDB_synax_operator* {
+        this.children[len(this.children)] = o
+        return this
+    }
+
+    getField(f cpstring) bahDB_synax_operator* {
+        if this.left == f {
+            return this
+        }
+        first bahDB_synax_operator* = null
+        i=0; for i < len(this.children), i++ {
+            c = this.children[i]
+            if c.left == f {
+                if first == null {
+                    first = c
+                } else {
+                    first.children[len(first.children)] = c
+                }
+            }
+        }
+        return first
+    }
+
+    check(v cpstring) bool {
+        r bool
+        if this.op == DB_EQUALS {
+            r = this.right == v
+        } else if this.op == DB_NOT_EQUALS {
+            r = this.right != v
+        } else if this.op == DB_GREATER {
+            r = strToInt(v) > strToInt(this.right)
+        } else if this.op == DB_LESS {
+            r = strToInt(v) < strToInt(this.right)
+        } else if this.op == DB_GREATER_EQUAL {
+            r = strToInt(v) >= strToInt(this.right)
+        } else if this.op == DB_LESS_EQUAL {
+            r = strToInt(v) <= strToInt(this.right)
+        } else if this.op == DB_LIKE {
+            a = strAsArr(this.right)
+            if len(a) == 3 && a[1] == '%' {
+                r = true
+            } else if len(a) < 3 {
+                r = false
+            } else {
+                vs = string(v)
+                if vs.length < 2 {
+                    r = false
+                } else {
+                    vs.trimLeft(1)
+                    vs.trimRight(1)
+                    if len(a) >= 4 && a[1] == '%' && a[len(a)-2] == '%' {
+                        comp = string(this.right)
+                        comp.trimLeft(2)
+                        comp.trimRight(2)
+                        r = vs.count(comp.str()) > 0
+                    } else if a[1] == '%' {
+                        comp = string(this.right)
+                        comp.trimLeft(2)
+                        comp.trimRight(1)
+                        println(vs.str() + " AND "+ comp.str())
+                        r = vs.hasSuffix(comp.str()) == 1
+                    } else if a[len(a)-2] == '%' {
+                        comp = string(this.right)
+                        comp.trimLeft(1)
+                        comp.trimRight(2)
+                        r = vs.hasPrefix(comp.str()) == 1
+                    } else {
+                        r = this.right == v
+                    }
+                }
+            }
+        }
+        if r == false {
+            return false
+        }
+
+        i=0; for i < len(this.children), i++ {
+            c = this.children[i]
+            if c.left == this.left {
+                if c.check(v) == false {
+                    return false
+                }
+            }
+        }
+
+        return true
+    }
+
+}
+
+//Creates a database condition.
+//Adding multiple condistion:
+//    dbWhere() + dbWhere() 
+//results in both conditions needing to be true.
+dbWhere(l cpstring, op int, r reflectElement) bahDB_synax_operator* {
+    o = new bahDB_synax_operator
+    o.left = l
+    o.op = op
+    o.right = toJson(r)
+    return o
+}

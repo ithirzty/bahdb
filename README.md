@@ -1,5 +1,5 @@
 # BahDB
-BahDB is a fast relational database, built in Bah for Bah.
+BahDB is a fast relational database, built in [Bah](https://github.com/ithirzty/bah) for Bah.
 
 It is really simple to use and really shows how simple and elegant Bah can be.
 
@@ -29,6 +29,31 @@ db.open("path/to/my/database.db")
 db.close()
 ```
 
+### Conditions
+Used for determining which elements must be affected.
+```bah
+condition = dbWhere("field", DB_EQUALS, value)
+//means any element where element.field == value
+```
+
+#### Operations
+Here is the list of all operations availables:
+- `DB_EQUALS`
+- `DB_NOT_EQUALS`
+- `DB_GREATER`
+- `DB_LESS`
+- `DB_GREATER_EQUAL`
+- `DB_LESS_EQUAL`
+- `DB_LIKE`
+
+#### Chaining operations
+You can add multiple operations together by using the `+` operator:
+```bah
+condition = dbWhere("field", DB_EQUALS, value) + dbWhere("field2", DB_LIKE, "%test%")
+//means any element where element.field == value
+//and element.field2 contains "test"
+```
+
 ### Inserting
 Used for inserting an element in the database.
 ```bah
@@ -41,7 +66,7 @@ Used for updating the content of an element inside the database.
 ```bah
 template = new myStruct
 
-db.update("field", value, template, "fielToSet", valueToSet)
+db.update(condition, template, "fielToSet", valueToSet)
 ```
 
 ### Selecting
@@ -49,13 +74,13 @@ Used for fetching the requested elements from the databse.
 ```bah
 res = []myStruct*
 
-db.select("field", value, res)
+db.select(condition, res)
 ```
 
 ### Deleting
 Used for deleting elements from the database.
 ```bah
-db.delete("field", value)
+db.delete(condition)
 ```
 
 ## Example
