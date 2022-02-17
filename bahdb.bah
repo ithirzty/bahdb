@@ -263,6 +263,14 @@ struct bahDB {
             v = indfrp[i]
             if v.size >= size {
                 e.pos = v.pos
+                j = toJson(e)
+                size = strlen(j)
+                serS = intToStr(size)
+                j = "\n"+serS+"\n"+j
+                size = size + strlen(serS) + 2
+                if v.size < size {
+                    continue
+                }
                 found = true
                 this.write(j, v.pos + h.dataPos)
                 k=i+1; for k < len(h.freePos), k++ {
@@ -382,7 +390,32 @@ struct bahDB {
         v = new bahDB_vacant
         v.pos = start - h.dataPos
         v.size = blockSize
-        h.freePos[len(h.freePos)] = v
+
+        found = false
+        i=0; for i < len(h.freePos), i++ {
+            fp = h.freePos[i]
+            downMerge = v.pos - fp.pos - fp.size
+            upMerge = fp.pos - v.pos - v.size
+            isMerged = false
+            if downMerge <= 10 && downMerge > 0 {
+                found = true
+                fp.size = fp.size + v.size
+                v = fp
+                isMerged = true
+            }
+            if upMerge <= 10 && upMerge > 0 {
+                found = true
+                fp.pos = v.pos
+                fp.size = fp.size + v.size
+                isMerged = true
+            }
+            if isMerged == true {
+                break
+            }
+        }
+        if found == false {
+            h.freePos[len(h.freePos)] = v
+        }
         memset(this.getAtOffset(start), <int>' ', blockSize)
     }
 
@@ -433,11 +466,6 @@ struct bahDB {
                     p.next = n.next
                     
                     isFirst = p in refInd
-                    isFound = p in h.indexes
-
-                    if isFirst != isFound {
-
-                    }
 
                     if isFirst == false {
                         j = toJson(p)
