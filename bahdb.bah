@@ -37,27 +37,33 @@ struct bahDB__header {
 
 __bahDB_mutex = []cpstring
 
+    //INTERNAL FUNCTION
 __bahDB_deleteMutexes() {
     i=0; for i < len(__bahDB_mutex), i++ {
         removeFile(__bahDB_mutex[i])
     }
 }
 
+    //INTERNAL FUNCTION
 __bahDB_ok_exit = atexit(__bahDB_deleteMutexes)
 
 struct bahDB {
     fm: fileMap
     name: cpstring
     m: cpstring
+    
+    //INTERNAL FUNCTION
     lock() {
         for mkdir(this.m, 600) == -1 {
             usleep(300)
         }
     }
+    //INTERNAL FUNCTION
     unlock() {
         removeFile(this.m)
     }
 
+    //INTERNAL FUNCTION
     grow(nb int) {
         this.fm.close()
         fs = fileStream{}
@@ -69,30 +75,30 @@ struct bahDB {
         this.fm.open(this.name)
     }
 
+    //INTERNAL FUNCTION
     getAtOffset(i int) cpstring {
         p cpstring = this.fm.p
         return noCheck(p + i)
     }
 
-    // growIndex(h bahDB__header*, i int) {
-        
-    //     this.grow(i)
-    // }
-
+    //INTERNAL FUNCTION
     getChar(i int) char {
         p cpstring = this.fm.p
         return noCheck(p[i])
     }
 
+    //INTERNAL FUNCTION
     write(s cpstring, pos int) {
         memcpy(this.getAtOffset(pos), s, strlen(s))
     }
 
+    //INTERNAL FUNCTION
     serialHeader(h bahDB__header*) {
         j = toJson(h)
         this.write(intToStr(strlen(j))+"\n"+j, 0)
     }
 
+    //INTERNAL FUNCTION
     loadHeader() bahDB__header* {
         h = new bahDB__header
         nbs = []char
@@ -110,6 +116,7 @@ struct bahDB {
         return h
     }
 
+    //INTERNAL FUNCTION
     readAtPos(i int, e reflectElement) {
 
         c = this.getChar(i)
@@ -134,6 +141,7 @@ struct bahDB {
         j.scan(e)
     }
 
+    //INTERNAL FUNCTION
     readJsonAtPos(i int) cpstring {
         c = this.getChar(i)
         for isSpace(c), i++ {
@@ -153,6 +161,7 @@ struct bahDB {
         return s
     }
 
+    //INTERNAL FUNCTION
     getFreePos(s int, h bahDB__header*) int {
         i=0; for i < len(h.freePos), i++ {
             v = h.freePos[i]
@@ -163,6 +172,7 @@ struct bahDB {
         return -1
     }
 
+    //INTERNAL FUNCTION
     getSize(e reflectElement) int {
         j = toJson(e)
         size = strlen(j)
@@ -171,6 +181,7 @@ struct bahDB {
         return size
     }
 
+    //INTERNAL FUNCTION
     append(e reflectElement, h bahDB__header*) {
         j = toJson(e)
         size = strlen(j)
@@ -203,6 +214,7 @@ struct bahDB {
         }
     }
 
+    //INTERNAL FUNCTION
     appendEntry(e bahDB_entry*, h bahDB__header*) {
         e.pos = h.lastPos
         j = toJson(e)
@@ -237,6 +249,7 @@ struct bahDB {
         }
     }
 
+    //INTERNAL FUNCTION
     insertReference(r bahDB_ref*, h bahDB__header*) {
         i=0; for i < len(h.indexes), i++ {
             ind = h.indexes[i]
@@ -255,6 +268,7 @@ struct bahDB {
         h.indexes[len(h.indexes)] = r
     }
 
+    //INTERNAL FUNCTION
     insertReferences(e bahDB_entry*, el reflectElement, h bahDB__header*) []bahDB_ref* {
         ret = []bahDB_ref*
         i=0; for i < len(el.structLayout), i++ {
@@ -271,6 +285,7 @@ struct bahDB {
     }
     
 
+    //INTERNAL FUNCTION
     getPos(f cpstring, v cpstring) []int {
 
         h = this.loadHeader()
@@ -298,6 +313,7 @@ struct bahDB {
         return ret
     }
 
+    //INTERNAL FUNCTION
     deleteByPos(i int, h bahDB__header*) {
         c = this.getChar(i)
         for isSpace(c), i++ {
@@ -321,7 +337,7 @@ struct bahDB {
         memset(this.getAtOffset(start), <int>' ', blockSize)
     }
 
-
+    //INTERNAL FUNCTION
     deleteRefs(e jsonElement*, pos int, h bahDB__header*) {
         i=0; for i < len(h.indexes), i++ {
             ind = h.indexes[i]
@@ -343,8 +359,6 @@ struct bahDB {
                     noCheck(h.indexes->length = l-1)
                 }
                 continue
-            } else {
-
             }
             n = ind
             p bahDB_ref*
@@ -371,20 +385,17 @@ struct bahDB {
                         j = "\n"+serS+"\n"+j
                         size = size + strlen(serS) + 2
                         this.write(j, p.pos + h.dataPos)
-                    } else {
-
                     }
 
                     this.deleteByPos(n.pos + h.dataPos, h)
                     break
-                } else {
-
                 }
             }
         }
     }
 
-    //
+    //Opens a new database with the specified file.
+    //If non-existing or blank, a new database will be created.
     open(name cpstring) {
         fs = fileStream{}
         this.fm = fileMap{}
@@ -413,12 +424,14 @@ struct bahDB {
         }
     }
     
-
+    //Closes a database.
+    //Must be called at some point if you .open() a database.
     close() {
         this.fm.close()
     }
 
-
+    //Inserts an element to the database.
+    //Pass it a pointer to any structure.
     insert(e reflectElement) {
         this.lock()
         
@@ -435,6 +448,13 @@ struct bahDB {
         this.unlock()
     }
 
+    //Selects element(s) from the database where the condition is respected.
+    //select(field, value, element)
+    //  field: the field to check
+    //  value: the value of the field
+    //  element: a pointer to the structure that needs to be scaned.
+    //           This can be either an array of pointer (of the struct's type)
+    //           or a single pointer to a structure (that needs to be allocated with new).
     select(f cpstring, v reflectElement, e reflectElement) {
         this.lock()
         h = this.loadHeader()
@@ -464,6 +484,10 @@ struct bahDB {
         this.unlock()
     }
 
+    //Deletes element(s) from the database.
+    //delete(field, value)
+    //  field: the field to check
+    //  value: the value of the field
     delete(f cpstring, v reflectElement) {
         this.lock()
         h = this.loadHeader()
@@ -484,6 +508,13 @@ struct bahDB {
         this.unlock()
     }
 
+    //Updates element(s) of the database.
+    //update(field, value, template, setField, setValue)
+    //  field: the field to check
+    //  value: the value of the field
+    //  template: a structure used as a template (containing the fields of the element, must be empty)
+    //  setField: the field that needs to be updated
+    //  setValue: the new value for that field
     update(f cpstring, v reflectElement, e reflectElement, rf cpstring, rv reflectElement) {
         this.lock()
         h = this.loadHeader()
@@ -498,11 +529,12 @@ struct bahDB {
             k=0; for k < len(e.structLayout), k++ {
                 m = e.structLayout[k]
                 if m.name == rf {
-                    m.value = rv.value
+                    mv ptr* = m.value
+                    *mv = rv.value
                     e.structLayout[k] = m
-                    
                 }
             }
+
 
             //remove old data
             this.readAtPos(pos[i] + h.dataPos, entry)

@@ -1,21 +1,108 @@
 #include "iostream.bah"
+#include "time.bah"
 
 #include "bahdb.bah"
 
+#cLib "g"
 
-struct test {
-    a: int
-    b: cpstring
+struct message {
+    author: cpstring
+    content: cpstring
+    date: int
 }
 
-// #cLib "g"
-
-main(args []cpstring) int {
+demoInsert() {
     db = bahDB{}
-    db.open("test.dat")
+    db.open("test.db")
 
-    
+    m = new message
+
+    println("Who is the author of this message?")
+    print("> ")
+    m.author = stdinput()
+
+    println("What is the message?")
+    print("> ")
+    m.content = stdinput()
+    m.date = getTimeUnix()
+
+    db.insert(m)
 
     db.close()
+}
+
+demoUpdate() {
+    db = bahDB{}
+    db.open("test.db")
+
+    m = new message
+
+    println("Please input the message's author.")
+    print("> ")
+    author = stdinput()
+
+    println("What is the new message?")
+    print("> ")
+    content = stdinput()
+    
+    db.update("author", author, m, "content", content)
+    
+    db.close()
+}
+
+demoDelete() {
+    db = bahDB{}
+    db.open("test.db")
+
+    m = new message
+
+    println("Please input the message's author.")
+    print("> ")
+    author = stdinput()
+
+    db.delete("author", author)
+    
+    db.close()
+}
+
+demoSelect() {
+    db = bahDB{}
+    db.open("test.db")
+
+    m = new message
+
+    println("Please input the message's author.")
+    print("> ")
+    author = stdinput()
+
+    res = []message*    
+    db.select("author", author, res)
+    
+    println(toJson(res))
+
+    db.close()
+}
+
+
+chooseCMD() {
+    println("Input a command (insert, update, delete, select).")
+    print("> ")
+    cmd = stdinput()
+    if cmd == "insert" {
+        demoInsert()
+    } else if cmd == "update" {
+        demoUpdate()
+    } else if cmd == "delete" {
+        demoDelete()
+    } else if cmd == "select" {
+        demoSelect()
+    }
+}
+
+main(args []cpstring) int {
+    for 1 == 1 {
+        chooseCMD()
+    }
+
     return 0
 }
