@@ -1,7 +1,7 @@
 #include "iostream.bah"
 #include "thread.bah"
 #include "rand.bah"
-#include "json.bah"
+#import "json.bah"
 
 #define! usleep(i int)
 #define! atexit(p ptr) int

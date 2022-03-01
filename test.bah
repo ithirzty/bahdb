@@ -1,9 +1,7 @@
 #include "iostream.bah"
 #include "time.bah"
 
-#include "bahdb.bah"
-
-#cLib "g"
+#import "bahdb.bah"
 
 struct message {
     author: cpstring
@@ -77,7 +75,7 @@ demoSelect() {
     author = stdinput()
 
     res = []message*    
-    db.select(dbWhere("author", DB_EQUALS, author), res)
+    db.select(dbWhere("author", DB_EQUALS, author), &res)
     
     println(toJson(res))
 
